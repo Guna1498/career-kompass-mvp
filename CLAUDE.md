@@ -8,9 +8,9 @@ action plan. Built as an MVP to demonstrate full-stack AI product capability.
 ## Tech stack
 - Backend: FastAPI (Python 3.11), runs on port 8000
 - Frontend: React + Vite (plain JavaScript, no TypeScript), runs on port 5173
-- AI: Anthropic Claude API, model is always claude-sonnet-4-6
+- AI: Google Gemini API (gemini-1.5-flash)
 - PDF parsing: PyMuPDF (imported as fitz)
-- Environment variables: python-dotenv
+- Environment variables: python-dotenv (key name: GEMINI_API_KEY)
 - Package manager: pip (backend), npm (frontend)
 
 ## Folder structure
