@@ -1,4 +1,5 @@
-const BASE = "/api";
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const BASE = `${BASE_URL}/api`;
 
 function authHeader() {
   const token = localStorage.getItem("ck_token");
