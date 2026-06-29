@@ -2,6 +2,9 @@ fastapi
 uvicorn[standard]
 python-multipart
 PyMuPDF
-google-genai
+groq
+python-docx
+reportlab
+supabase
 python-dotenv
 httpx

@@ -1,3 +1,5 @@
+import ScoreRing from "../components/ScoreRing.jsx";
+
 export default function GapAnalysisPage({ gapAnalysis, onNext }) {
   const { match_score, matched_skills, missing_skills, transferable_skills, summary } =
     gapAnalysis;
@@ -5,12 +7,9 @@ export default function GapAnalysisPage({ gapAnalysis, onNext }) {
   return (
     <div className="card">
       <h2>Gap Analysis</h2>
-      <p className="subtitle">Here's how your CV stacks up against the role.</p>
+      <p className="subtitle">Here&apos;s how your CV stacks up against the role.</p>
 
-      <div className="score-section">
-        <div className="score-number">{match_score}</div>
-        <div className="score-label">Match Score out of 100</div>
-      </div>
+      <ScoreRing score={match_score} />
 
       <div className="skills-grid">
         <div className="skills-section">
