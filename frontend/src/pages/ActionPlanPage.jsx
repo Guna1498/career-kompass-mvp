@@ -2,12 +2,23 @@ import { useState, useEffect } from "react";
 import { actionPlan } from "../api/index.js";
 import Spinner from "../components/Spinner.jsx";
 import ErrorMessage from "../components/ErrorMessage.jsx";
+import CoverLetterSection from "./CoverLetterSection.jsx";
+
+function MailIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+    </svg>
+  );
+}
 
 export default function ActionPlanPage({ cvText, jobDescription, gapAnalysis, onReset }) {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [checked, setChecked] = useState([]);
+  const [showCoverLetter, setShowCoverLetter] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -89,6 +100,32 @@ export default function ActionPlanPage({ cvText, jobDescription, gapAnalysis, on
       <button className="btn-outline" style={{ marginTop: "24px" }} onClick={onReset}>
         ↩ Start Over
       </button>
+
+      {/* ── Want to go further? ── */}
+      <div className="go-further-divider" />
+
+      <div className="go-further-heading">Want to go further?</div>
+
+      {!showCoverLetter ? (
+        <div className="go-further-card">
+          <div className="go-further-icon"><MailIcon /></div>
+          <div className="go-further-body">
+            <div className="go-further-title">Cover Letter Generator</div>
+            <div className="go-further-desc">
+              Turn your tailored CV into a matching cover letter in one click.
+            </div>
+          </div>
+          <button className="btn-primary" style={{ margin: 0, whiteSpace: "nowrap" }} onClick={() => setShowCoverLetter(true)}>
+            Try it →
+          </button>
+        </div>
+      ) : (
+        <CoverLetterSection
+          cvText={cvText}
+          jobDescription={jobDescription}
+          onHide={() => setShowCoverLetter(false)}
+        />
+      )}
     </div>
   );
 }

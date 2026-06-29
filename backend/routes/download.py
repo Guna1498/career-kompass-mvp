@@ -20,6 +20,12 @@ class DownloadRequest(BaseModel):
     summary: str = ""
 
 
+class CoverLetterDownloadRequest(BaseModel):
+    cover_letter: str
+    subject_line: str
+    user_name: str
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _contact_line(pd: dict) -> str:
@@ -338,3 +344,137 @@ def download_pdf(body: DownloadRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {e}")
+
+
+# ── Cover Letter DOCX ──────────────────────────────────────────────────────────
+
+@router.post("/download-cover-letter/docx")
+def download_cover_letter_docx(body: CoverLetterDownloadRequest):
+    try:
+        from datetime import date
+        from docx import Document
+        from docx.shared import Pt, RGBColor
+        from docx.oxml.ns import qn
+        from docx.oxml import OxmlElement
+
+        GREY = RGBColor(0x6B, 0x72, 0x80)
+        GREEN = RGBColor(0x1D, 0x9E, 0x75)
+
+        doc = Document()
+        for section in doc.sections:
+            section.top_margin = Pt(72)
+            section.bottom_margin = Pt(72)
+            section.left_margin = Pt(72)
+            section.right_margin = Pt(72)
+
+        def add_run(para, text, bold=False, size=11, color=None):
+            run = para.add_run(text)
+            run.bold = bold
+            run.font.size = Pt(size)
+            if color:
+                run.font.color.rgb = color
+            return run
+
+        def add_para(text="", space_after=6):
+            p = doc.add_paragraph()
+            p.paragraph_format.space_after = Pt(space_after)
+            return p
+
+        # Name
+        name_p = add_para(space_after=2)
+        add_run(name_p, body.user_name, bold=True, size=14)
+
+        # Date
+        date_p = add_para(space_after=2)
+        add_run(date_p, date.today().strftime("%d %B %Y"), size=10, color=GREY)
+
+        # Subject line
+        subject_p = add_para(space_after=8)
+        add_run(subject_p, body.subject_line, bold=True, size=11)
+
+        # Divider (paragraph border bottom)
+        divider_p = add_para(space_after=10)
+        pPr = divider_p._p.get_or_add_pPr()
+        pBdr = OxmlElement("w:pBdr")
+        bottom = OxmlElement("w:bottom")
+        bottom.set(qn("w:val"), "single")
+        bottom.set(qn("w:sz"), "4")
+        bottom.set(qn("w:space"), "1")
+        bottom.set(qn("w:color"), "1D9E75")
+        pBdr.append(bottom)
+        pPr.append(pBdr)
+
+        # Cover letter body — split into paragraphs
+        paragraphs = [p.strip() for p in body.cover_letter.split("\n\n") if p.strip()]
+        for para_text in paragraphs:
+            p = add_para(space_after=6)
+            add_run(p, para_text, size=11)
+
+        buffer = BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+
+        return Response(
+            content=buffer.read(),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": "attachment; filename=cover_letter.docx"},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate cover letter DOCX: {e}")
+
+
+# ── Cover Letter PDF ───────────────────────────────────────────────────────────
+
+@router.post("/download-cover-letter/pdf")
+def download_cover_letter_pdf(body: CoverLetterDownloadRequest):
+    try:
+        from datetime import date
+        from reportlab.lib.colors import HexColor, black
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer
+
+        buffer = BytesIO()
+        doc_pdf = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=72,
+            leftMargin=72,
+            topMargin=72,
+            bottomMargin=72,
+        )
+
+        GREEN = HexColor("#1D9E75")
+        DARK = HexColor("#111827")
+        GREY = HexColor("#6B7280")
+
+        s_name    = ParagraphStyle("CLName",    fontName="Helvetica-Bold", fontSize=16, textColor=DARK,  spaceAfter=0)
+        s_date    = ParagraphStyle("CLDate",    fontName="Helvetica",      fontSize=9,  textColor=GREY,  spaceAfter=0)
+        s_subject = ParagraphStyle("CLSubject", fontName="Helvetica-Bold", fontSize=11, textColor=GREEN, spaceAfter=0)
+        s_body    = ParagraphStyle("CLBody",    fontName="Helvetica",      fontSize=10, textColor=DARK,  spaceAfter=0, leading=16)
+
+        story = [
+            Paragraph(_esc(body.user_name), s_name),
+            Spacer(1, 4),
+            Paragraph(_esc(date.today().strftime("%d %B %Y")), s_date),
+            Spacer(1, 6),
+            Paragraph(_esc(body.subject_line), s_subject),
+            Spacer(1, 8),
+            HRFlowable(width="100%", thickness=0.5, color=GREEN, spaceBefore=0, spaceAfter=12),
+        ]
+
+        paragraphs = [p.strip() for p in body.cover_letter.split("\n\n") if p.strip()]
+        for para_text in paragraphs:
+            story.append(Paragraph(_esc(para_text), s_body))
+            story.append(Spacer(1, 10))
+
+        doc_pdf.build(story)
+        buffer.seek(0)
+
+        return Response(
+            content=buffer.read(),
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=cover_letter.pdf"},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate cover letter PDF: {e}")

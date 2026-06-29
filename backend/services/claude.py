@@ -214,6 +214,45 @@ Gap analysis:
         raise HTTPException(status_code=500, detail="Failed to rewrite CV. Please try again.")
 
 
+def generate_cover_letter(cv_text: str, job_description: str, user_name: str) -> dict:
+    prompt = f"""You are a professional cover letter writer. Generate a tailored cover letter for the candidate.
+
+STRICT RULES:
+1. Return ONLY valid JSON — no preamble, no markdown fences, no explanation
+2. Extract the company name directly from the job description — NEVER use [Company Name], [Hiring Manager], or any other placeholder text
+3. Reference specific requirements from the job description and specific experiences from the CV
+4. Sign the letter with the candidate name provided
+
+Cover letter structure (4 paragraphs):
+- Paragraph 1 (Opening): State the exact role applied for. Write a strong, specific hook about why this particular role and company appeals to the candidate.
+- Paragraph 2 (Why them): Reference 2-3 specific things about the company or role pulled from the JD that appeal to the candidate.
+- Paragraph 3 (Why you): Map 2-3 of the strongest matching experiences from the CV to specific JD requirements. Use concrete examples and metrics where available.
+- Paragraph 4 (Closing): Express enthusiasm, state availability for interview, and include a clear call to action.
+
+The JSON must have exactly these fields:
+{{
+  "cover_letter": "full cover letter as a single string. Use \\n\\n between paragraphs. Start with Dear [extracted name/team], — never use a placeholder. End with Yours sincerely,\\n\\n{user_name}",
+  "subject_line": "concise email subject line, e.g. Application for Senior AI Engineer — {user_name}",
+  "word_count": <integer word count of the cover_letter value>,
+  "keywords_used": ["each JD keyword naturally included in the letter"]
+}}
+
+Job description:
+{job_description}
+
+CV:
+{cv_text}
+
+Candidate name: {user_name}"""
+    try:
+        return _parse_json(call_ai(prompt))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[generate_cover_letter] JSON parse failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate cover letter. Please try again.")
+
+
 def action_plan(cv_text: str, job_description: str, gaps: dict) -> dict:
     prompt = f"""Generate a prioritised action plan to help this candidate close their skill gaps and improve their chances for the role. Return ONLY valid JSON with no preamble, no markdown, no explanation.
 

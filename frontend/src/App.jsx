@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import "./App.css";
 import { getMe } from "./api/index.js";
+import useDarkMode from "./hooks/useDarkMode.js";
 import LoginPage from "./pages/LoginPage.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
@@ -22,6 +23,7 @@ function getPageTitle(nav, step) {
 }
 
 export default function App() {
+  const { isDark, toggleDark } = useDarkMode();
   const [user, setUser] = useState(null);
   const [nav, setNav] = useState("dashboard");
   const [step, setStep] = useState(1);
@@ -64,7 +66,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar nav={nav} setNav={handleNavChange} onLogout={logout} />
+      <Sidebar nav={nav} setNav={handleNavChange} onLogout={logout} isDark={isDark} toggleDark={toggleDark} />
 
       <div className="main-content">
         {/* Top bar */}

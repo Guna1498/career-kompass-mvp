@@ -128,3 +128,31 @@ export async function downloadCVPdf(cvResult) {
     "Failed to generate PDF",
   );
 }
+
+export async function generateCoverLetter(cvText, jobDescription, userName) {
+  const res = await fetch(`${BASE}/cover-letter`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify({ cv_text: cvText, job_description: jobDescription, user_name: userName }),
+  });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to generate cover letter"));
+  return res.json();
+}
+
+export async function downloadCoverLetterDocx(coverLetter, subjectLine, userName) {
+  await triggerBlobDownload(
+    `${BASE}/download-cover-letter/docx`,
+    { cover_letter: coverLetter, subject_line: subjectLine, user_name: userName },
+    "cover_letter.docx",
+    "Failed to generate Word document",
+  );
+}
+
+export async function downloadCoverLetterPdf(coverLetter, subjectLine, userName) {
+  await triggerBlobDownload(
+    `${BASE}/download-cover-letter/pdf`,
+    { cover_letter: coverLetter, subject_line: subjectLine, user_name: userName },
+    "cover_letter.pdf",
+    "Failed to generate PDF",
+  );
+}

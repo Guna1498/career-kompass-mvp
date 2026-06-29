@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routes import jd, cv, rewrite, action_plan, auth, analyses, download
+from routes import jd, cv, rewrite, action_plan, auth, analyses, download, cover_letter
 
 app = FastAPI(title="Career Kompass API")
 
@@ -20,6 +20,7 @@ app.include_router(rewrite.router, prefix="/api")
 app.include_router(action_plan.router, prefix="/api")
 app.include_router(analyses.router, prefix="/api")
 app.include_router(download.router, prefix="/api")
+app.include_router(cover_letter.router, prefix="/api")
 
 
 @app.get("/health")
