@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { rewriteCV, downloadCVDocx, downloadCVPdf } from "../api/index.js";
 import Spinner from "../components/Spinner.jsx";
 import ErrorMessage from "../components/ErrorMessage.jsx";
+import useDownloadButton from "../hooks/useDownloadButton.js";
 
 function WordIcon() {
   return (
@@ -22,26 +23,6 @@ function PdfIcon() {
       <path d="M9 15v-4h2a2 2 0 0 1 0 4H9z" />
     </svg>
   );
-}
-
-function useDownloadButton() {
-  const [state, setState] = useState("idle");
-
-  async function trigger(fn) {
-    if (state !== "idle") return;
-    setState("loading");
-    try {
-      await fn();
-      setState("success");
-      setTimeout(() => setState("idle"), 2000);
-    } catch (err) {
-      setState("idle");
-      throw err;
-    }
-  }
-
-  const label = state === "loading" ? "Generating…" : state === "success" ? "Downloaded!" : null;
-  return { state, trigger, label };
 }
 
 function SectionHeading({ children }) {
@@ -259,8 +240,8 @@ export default function CVRewritePage({ cvText, jobDescription, gapAnalysis, onN
       </div>
       {downloadError && <ErrorMessage message={downloadError} />}
 
-      <button className="btn-primary" onClick={onNext}>
-        Get Action Plan →
+      <button className="btn-primary" onClick={() => onNext(result)}>
+        Choose a CV Template →
       </button>
     </div>
   );

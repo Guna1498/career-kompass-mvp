@@ -121,10 +121,10 @@ export async function downloadCVDocx(cvResult) {
   );
 }
 
-export async function downloadCVPdf(cvResult) {
+export async function downloadCVPdf(cvResult, template = "modern") {
   await triggerBlobDownload(
     `${BASE}/download-cv/pdf`,
-    cvResult,
+    { ...cvResult, template },
     "rewritten_cv.pdf",
     "Failed to generate PDF",
   );

@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 
-const STEPS = ["Job Description", "Upload CV", "Gap Analysis", "CV Rewrite", "Action Plan"];
+const STEPS = ["Job Description", "Upload CV", "Gap Analysis", "CV Rewrite", "Choose Template", "Action Plan"];
 
 export default function ProgressBar({ currentStep }) {
   return (

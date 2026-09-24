@@ -18,6 +18,7 @@ class DownloadRequest(BaseModel):
     skills: dict = {}
     keywords_added: list[str] = []
     summary: str = ""
+    template: str = "modern"
 
 
 class CoverLetterDownloadRequest(BaseModel):
@@ -206,16 +207,339 @@ def download_docx(body: DownloadRequest):
 
 # ── PDF ────────────────────────────────────────────────────────────────────────
 
+def _build_modern_story(body: DownloadRequest) -> list:
+    """Green-accent template (original default design)."""
+    from reportlab.lib.colors import HexColor
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import HRFlowable, Paragraph, Spacer
+
+    GREEN = HexColor("#1D9E75")
+    DARK = HexColor("#111827")
+    GREY = HexColor("#6B7280")
+
+    s_name    = ParagraphStyle("PKName",    fontName="Helvetica-Bold", fontSize=20, leading=24, textColor=DARK,  spaceAfter=0)
+    s_title   = ParagraphStyle("PKTitle",   fontName="Helvetica",      fontSize=12, leading=15, textColor=GREEN, spaceAfter=0)
+    s_contact = ParagraphStyle("PKContact", fontName="Helvetica",      fontSize=9,  leading=12, textColor=GREY,  spaceAfter=0)
+    s_section = ParagraphStyle("PKSection", fontName="Helvetica-Bold", fontSize=11, textColor=GREEN, spaceBefore=12, spaceAfter=12)
+    s_job     = ParagraphStyle("PKJob",     fontName="Helvetica-Bold", fontSize=10, textColor=DARK,  spaceBefore=0,  spaceAfter=1)
+    s_meta    = ParagraphStyle("PKMeta",    fontName="Helvetica",      fontSize=9,  textColor=GREY,  spaceAfter=3)
+    s_body    = ParagraphStyle("PKBody",    fontName="Helvetica",      fontSize=10, textColor=DARK,  spaceAfter=4, leading=15)
+    s_bullet  = ParagraphStyle("PKBullet",  fontName="Helvetica",      fontSize=10, textColor=DARK,  leftIndent=20, spaceAfter=6, leading=15)
+    s_skill   = ParagraphStyle("PKSkill",   fontName="Helvetica",      fontSize=10, textColor=DARK,  spaceAfter=4,  leading=15)
+
+    def hr():
+        return HRFlowable(width="100%", thickness=0.5, color=GREEN, spaceBefore=2, spaceAfter=8)
+
+    story = []
+
+    pd = body.personal_details
+    if pd.get("name"):
+        story.append(Paragraph(_esc(pd["name"]), s_name))
+        story.append(Spacer(1, 8))
+    if pd.get("title"):
+        story.append(Paragraph(_esc(pd["title"]), s_title))
+        story.append(Spacer(1, 6))
+    contact = _contact_line(pd)
+    if contact:
+        story.append(Paragraph(_esc(contact), s_contact))
+        story.append(Spacer(1, 16))
+
+    am = body.about_me
+    if am.get("rewritten"):
+        story += [Paragraph("ABOUT ME", s_section), hr(),
+                  Paragraph(_esc(am["rewritten"]), s_body)]
+
+    if body.work_experience:
+        story += [Paragraph("WORK EXPERIENCE", s_section), hr()]
+        for i, job in enumerate(body.work_experience):
+            label = job.get("company", "")
+            if job.get("role"):
+                label += f"  —  {job['role']}"
+            story.append(Paragraph(_esc(label), s_job))
+
+            meta_parts = [job.get("period", ""), job.get("location", "")]
+            meta = "  |  ".join(p for p in meta_parts if p)
+            if meta:
+                story.append(Paragraph(_esc(meta), s_meta))
+
+            for b in job.get("bullets", []):
+                story.append(Paragraph(f"• {_esc(b.get('rewritten', ''))}", s_bullet))
+
+            if i < len(body.work_experience) - 1:
+                story.append(Spacer(1, 8))
+
+    if body.education:
+        story += [Paragraph("EDUCATION", s_section), hr()]
+        for edu in body.education:
+            label = edu.get("degree", "")
+            if edu.get("institution"):
+                label += f"  —  {edu['institution']}"
+            story.append(Paragraph(_esc(label), s_job))
+
+            meta_parts = [edu.get("period", ""), edu.get("location", "")]
+            meta = "  |  ".join(p for p in meta_parts if p)
+            if meta:
+                story.append(Paragraph(_esc(meta), s_meta))
+
+    if body.projects:
+        story += [Paragraph("PROJECTS", s_section), hr()]
+        for i, proj in enumerate(body.projects):
+            label = proj.get("name", "")
+            if proj.get("period"):
+                label += f"  |  {proj['period']}"
+            story.append(Paragraph(_esc(label), s_job))
+            for b in proj.get("bullets", []):
+                story.append(Paragraph(f"• {_esc(b.get('rewritten', ''))}", s_bullet))
+
+            if i < len(body.projects) - 1:
+                story.append(Spacer(1, 8))
+
+    sk = body.skills
+    if sk.get("rewritten"):
+        story += [Paragraph("SKILLS", s_section), hr()]
+        skill_pairs = _parse_skills(sk.get("rewritten", ""))
+        if skill_pairs:
+            for label, skills in skill_pairs:
+                story.append(Paragraph(
+                    f"<b>{_esc(label)}:</b> {_esc(skills)}",
+                    s_skill,
+                ))
+        else:
+            story.append(Paragraph(_esc(sk["rewritten"]), s_body))
+
+    return story
+
+
+def _build_classic_story(body: DownloadRequest) -> list:
+    """Minimal black-and-white serif template — centered header, understated rules."""
+    from reportlab.lib.colors import HexColor, black
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import HRFlowable, Paragraph, Spacer
+
+    GREY = HexColor("#595959")
+
+    s_name    = ParagraphStyle("CLSName",    fontName="Times-Bold",   fontSize=22, leading=26, textColor=black, alignment=TA_CENTER, spaceAfter=0)
+    s_title   = ParagraphStyle("CLSTitle",   fontName="Times-Italic", fontSize=12, leading=15, textColor=GREY,  alignment=TA_CENTER, spaceAfter=0)
+    s_contact = ParagraphStyle("CLSContact", fontName="Times-Roman",  fontSize=9,  leading=12, textColor=GREY,  alignment=TA_CENTER, spaceAfter=0)
+    s_section = ParagraphStyle("CLSSection", fontName="Times-Bold",   fontSize=11, textColor=black, spaceBefore=14, spaceAfter=6, tracking=1)
+    s_job     = ParagraphStyle("CLSJob",     fontName="Times-Bold",   fontSize=10.5, textColor=black, spaceBefore=0, spaceAfter=1)
+    s_meta    = ParagraphStyle("CLSMeta",    fontName="Times-Italic", fontSize=9,  textColor=GREY,  spaceAfter=3)
+    s_body    = ParagraphStyle("CLSBody",    fontName="Times-Roman",  fontSize=10.5, textColor=black, spaceAfter=4, leading=15)
+    s_bullet  = ParagraphStyle("CLSBullet",  fontName="Times-Roman",  fontSize=10.5, textColor=black, leftIndent=18, spaceAfter=6, leading=15)
+    s_skill   = ParagraphStyle("CLSSkill",   fontName="Times-Roman",  fontSize=10.5, textColor=black, spaceAfter=4, leading=15)
+
+    def hr():
+        return HRFlowable(width="100%", thickness=0.75, color=black, spaceBefore=2, spaceAfter=10)
+
+    story = []
+
+    pd = body.personal_details
+    if pd.get("name"):
+        story.append(Paragraph(_esc(pd["name"]).upper(), s_name))
+        story.append(Spacer(1, 6))
+    if pd.get("title"):
+        story.append(Paragraph(_esc(pd["title"]), s_title))
+        story.append(Spacer(1, 6))
+    contact = _contact_line(pd)
+    if contact:
+        story.append(Paragraph(_esc(contact), s_contact))
+        story.append(Spacer(1, 14))
+    story.append(hr())
+
+    am = body.about_me
+    if am.get("rewritten"):
+        story += [Paragraph("ABOUT ME", s_section),
+                  Paragraph(_esc(am["rewritten"]), s_body)]
+
+    if body.work_experience:
+        story.append(Paragraph("WORK EXPERIENCE", s_section))
+        for i, job in enumerate(body.work_experience):
+            label = job.get("company", "")
+            if job.get("role"):
+                label += f", {job['role']}"
+            story.append(Paragraph(_esc(label), s_job))
+
+            meta_parts = [job.get("period", ""), job.get("location", "")]
+            meta = "  |  ".join(p for p in meta_parts if p)
+            if meta:
+                story.append(Paragraph(_esc(meta), s_meta))
+
+            for b in job.get("bullets", []):
+                story.append(Paragraph(f"– {_esc(b.get('rewritten', ''))}", s_bullet))
+
+            if i < len(body.work_experience) - 1:
+                story.append(Spacer(1, 8))
+
+    if body.education:
+        story.append(Paragraph("EDUCATION", s_section))
+        for edu in body.education:
+            label = edu.get("degree", "")
+            if edu.get("institution"):
+                label += f", {edu['institution']}"
+            story.append(Paragraph(_esc(label), s_job))
+
+            meta_parts = [edu.get("period", ""), edu.get("location", "")]
+            meta = "  |  ".join(p for p in meta_parts if p)
+            if meta:
+                story.append(Paragraph(_esc(meta), s_meta))
+
+    if body.projects:
+        story.append(Paragraph("PROJECTS", s_section))
+        for i, proj in enumerate(body.projects):
+            label = proj.get("name", "")
+            if proj.get("period"):
+                label += f"  |  {proj['period']}"
+            story.append(Paragraph(_esc(label), s_job))
+            for b in proj.get("bullets", []):
+                story.append(Paragraph(f"– {_esc(b.get('rewritten', ''))}", s_bullet))
+
+            if i < len(body.projects) - 1:
+                story.append(Spacer(1, 8))
+
+    sk = body.skills
+    if sk.get("rewritten"):
+        story.append(Paragraph("SKILLS", s_section))
+        skill_pairs = _parse_skills(sk.get("rewritten", ""))
+        if skill_pairs:
+            for label, skills in skill_pairs:
+                story.append(Paragraph(
+                    f"<b>{_esc(label)}:</b> {_esc(skills)}",
+                    s_skill,
+                ))
+        else:
+            story.append(Paragraph(_esc(sk["rewritten"]), s_body))
+
+    return story
+
+
+def _header_row(left_html: str, right_html: str, s_left, s_right, col_widths) -> "Table":
+    """Borderless two-column row: bold entry on the left, italic dates/location on the right."""
+    from reportlab.platypus import Paragraph, Table, TableStyle
+
+    t = Table([[Paragraph(left_html, s_left), Paragraph(right_html, s_right)]], colWidths=col_widths)
+    t.setStyle(TableStyle([
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+    ]))
+    return t
+
+
+def _build_professional_story(body: DownloadRequest) -> list:
+    """LaTeX-resume-style template: centered serif header, tight section rules,
+    two-column job/education rows (bold entry left, italic dates/location right)."""
+    from reportlab.lib.colors import HexColor, black
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import HRFlowable, Paragraph, Spacer
+
+    GREY = HexColor("#595959")
+    LEFT_COL, RIGHT_COL = 4.2 * inch, 2.07 * inch
+
+    s_name    = ParagraphStyle("PFName",    fontName="Times-Bold",   fontSize=19, leading=23, textColor=black, alignment=TA_CENTER, spaceAfter=0)
+    s_title   = ParagraphStyle("PFTitle",   fontName="Times-Roman",  fontSize=11, leading=14, textColor=black, alignment=TA_CENTER, spaceAfter=0)
+    s_contact = ParagraphStyle("PFContact", fontName="Times-Roman",  fontSize=9,  leading=12, textColor=GREY,  alignment=TA_CENTER, spaceAfter=0)
+    s_section = ParagraphStyle("PFSection", fontName="Times-Bold",   fontSize=11, textColor=black, spaceBefore=12, spaceAfter=2)
+    s_left    = ParagraphStyle("PFRowLeft", fontName="Times-Bold",   fontSize=10.5, textColor=black, leading=13)
+    s_right   = ParagraphStyle("PFRowRight",fontName="Times-Italic", fontSize=9.5,  textColor=black, leading=13)
+    s_body    = ParagraphStyle("PFBody",    fontName="Times-Roman",  fontSize=10, textColor=black, spaceAfter=4, leading=13.5)
+    s_bullet  = ParagraphStyle("PFBullet",  fontName="Times-Roman",  fontSize=10, textColor=black, leftIndent=14, spaceAfter=3, leading=13)
+    s_skill   = ParagraphStyle("PFSkill",   fontName="Times-Roman",  fontSize=10, textColor=black, spaceAfter=3, leading=13)
+
+    def hr():
+        return HRFlowable(width="100%", thickness=0.75, color=black, spaceBefore=0, spaceAfter=8)
+
+    story = []
+
+    pd = body.personal_details
+    if pd.get("name"):
+        story.append(Paragraph(_esc(pd["name"]), s_name))
+        story.append(Spacer(1, 4))
+    if pd.get("title"):
+        story.append(Paragraph(_esc(pd["title"]), s_title))
+        story.append(Spacer(1, 4))
+    contact = _contact_line(pd)
+    if contact:
+        story.append(Paragraph(_esc(contact).replace("  |  ", "  ·  "), s_contact))
+    story.append(Spacer(1, 10))
+
+    am = body.about_me
+    if am.get("rewritten"):
+        story += [Paragraph("ABOUT ME", s_section), hr(),
+                  Paragraph(_esc(am["rewritten"]), s_body)]
+
+    if body.work_experience:
+        story += [Paragraph("WORK EXPERIENCE", s_section), hr()]
+        for i, job in enumerate(body.work_experience):
+            left = _esc(job.get("company", ""))
+            if job.get("role"):
+                left += f", {_esc(job['role'])}"
+            right = "  |  ".join(_esc(p) for p in [job.get("period", ""), job.get("location", "")] if p)
+            story.append(_header_row(left, right, s_left, s_right, [LEFT_COL, RIGHT_COL]))
+
+            for b in job.get("bullets", []):
+                story.append(Paragraph(f"• {_esc(b.get('rewritten', ''))}", s_bullet))
+
+            if i < len(body.work_experience) - 1:
+                story.append(Spacer(1, 6))
+
+    if body.education:
+        story += [Paragraph("EDUCATION", s_section), hr()]
+        for edu in body.education:
+            left = _esc(edu.get("degree", ""))
+            if edu.get("institution"):
+                left += f", {_esc(edu['institution'])}"
+            right = "  |  ".join(_esc(p) for p in [edu.get("period", ""), edu.get("location", "")] if p)
+            story.append(_header_row(left, right, s_left, s_right, [LEFT_COL, RIGHT_COL]))
+
+    if body.projects:
+        story += [Paragraph("PROJECTS", s_section), hr()]
+        for i, proj in enumerate(body.projects):
+            left = _esc(proj.get("name", ""))
+            right = _esc(proj.get("period", ""))
+            story.append(_header_row(left, right, s_left, s_right, [LEFT_COL, RIGHT_COL]))
+
+            for b in proj.get("bullets", []):
+                story.append(Paragraph(f"• {_esc(b.get('rewritten', ''))}", s_bullet))
+
+            if i < len(body.projects) - 1:
+                story.append(Spacer(1, 6))
+
+    sk = body.skills
+    if sk.get("rewritten"):
+        story += [Paragraph("SKILLS", s_section), hr()]
+        skill_pairs = _parse_skills(sk.get("rewritten", ""))
+        if skill_pairs:
+            for label, skills in skill_pairs:
+                story.append(Paragraph(
+                    f"<b>{_esc(label)}:</b> {_esc(skills)}",
+                    s_skill,
+                ))
+        else:
+            story.append(Paragraph(_esc(sk["rewritten"]), s_body))
+
+    return story
+
+
+_PDF_TEMPLATES = {
+    "modern": _build_modern_story,
+    "classic": _build_classic_story,
+    "professional": _build_professional_story,
+}
+
+
 @router.post("/download-cv/pdf")
 def download_pdf(body: DownloadRequest):
     try:
-        from reportlab.lib.colors import HexColor, black
         from reportlab.lib.pagesizes import A4
-        from reportlab.lib.styles import ParagraphStyle
-        from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer
+        from reportlab.platypus import SimpleDocTemplate
 
         buffer = BytesIO()
-        # Issue 4: 72pt margins on all sides
         doc_pdf = SimpleDocTemplate(
             buffer,
             pagesize=A4,
@@ -225,116 +549,8 @@ def download_pdf(body: DownloadRequest):
             bottomMargin=72,
         )
 
-        GREEN = HexColor("#1D9E75")
-        DARK = HexColor("#111827")
-        GREY = HexColor("#6B7280")
-
-        # Issue 1: name/title/contact styles with spaceAfter=0 — spacing handled by Spacer()
-        s_name    = ParagraphStyle("PKName",    fontName="Helvetica-Bold", fontSize=20, textColor=DARK,  spaceAfter=0)
-        s_title   = ParagraphStyle("PKTitle",   fontName="Helvetica",      fontSize=12, textColor=GREEN, spaceAfter=0)
-        s_contact = ParagraphStyle("PKContact", fontName="Helvetica",      fontSize=9,  textColor=GREY,  spaceAfter=0)
-        # Issue 4: section heading 11pt green bold, spaceAfter=12
-        s_section = ParagraphStyle("PKSection", fontName="Helvetica-Bold", fontSize=11, textColor=GREEN, spaceBefore=12, spaceAfter=12)
-        s_job     = ParagraphStyle("PKJob",     fontName="Helvetica-Bold", fontSize=10, textColor=DARK,  spaceBefore=0,  spaceAfter=1)
-        s_meta    = ParagraphStyle("PKMeta",    fontName="Helvetica",      fontSize=9,  textColor=GREY,  spaceAfter=3)
-        s_body    = ParagraphStyle("PKBody",    fontName="Helvetica",      fontSize=10, textColor=DARK,  spaceAfter=4, leading=15)
-        # Issue 4: bullets indented 20pt, spaceAfter=6
-        s_bullet  = ParagraphStyle("PKBullet",  fontName="Helvetica",      fontSize=10, textColor=DARK,  leftIndent=20, spaceAfter=6, leading=15)
-        # Issue 2: skill lines — bold label inline via markup, spaceAfter=4
-        s_skill   = ParagraphStyle("PKSkill",   fontName="Helvetica",      fontSize=10, textColor=DARK,  spaceAfter=4,  leading=15)
-
-        def hr():
-            # Thin green line spanning full width, with controlled spacing
-            return HRFlowable(width="100%", thickness=0.5, color=GREEN, spaceBefore=2, spaceAfter=8)
-
-        story = []
-
-        # ── Personal header (Issue 1 fix: explicit Spacer between each element) ──
-        pd = body.personal_details
-        if pd.get("name"):
-            story.append(Paragraph(_esc(pd["name"]), s_name))
-            story.append(Spacer(1, 8))
-        if pd.get("title"):
-            story.append(Paragraph(_esc(pd["title"]), s_title))
-            story.append(Spacer(1, 6))
-        contact = _contact_line(pd)
-        if contact:
-            story.append(Paragraph(_esc(contact), s_contact))
-            story.append(Spacer(1, 16))
-
-        # ── About Me ──
-        am = body.about_me
-        if am.get("rewritten"):
-            story += [Paragraph("ABOUT ME", s_section), hr(),
-                      Paragraph(_esc(am["rewritten"]), s_body)]
-
-        # ── Work Experience ──
-        if body.work_experience:
-            story += [Paragraph("WORK EXPERIENCE", s_section), hr()]
-            for i, job in enumerate(body.work_experience):
-                label = job.get("company", "")
-                if job.get("role"):
-                    label += f"  —  {job['role']}"
-                story.append(Paragraph(_esc(label), s_job))
-
-                meta_parts = [job.get("period", ""), job.get("location", "")]
-                meta = "  |  ".join(p for p in meta_parts if p)
-                if meta:
-                    story.append(Paragraph(_esc(meta), s_meta))
-
-                for b in job.get("bullets", []):
-                    story.append(Paragraph(f"• {_esc(b.get('rewritten', ''))}", s_bullet))
-
-                # Issue 4: 8pt gap between entries (skip after last)
-                if i < len(body.work_experience) - 1:
-                    story.append(Spacer(1, 8))
-
-        # ── Education ──
-        if body.education:
-            story += [Paragraph("EDUCATION", s_section), hr()]
-            for edu in body.education:
-                label = edu.get("degree", "")
-                if edu.get("institution"):
-                    label += f"  —  {edu['institution']}"
-                story.append(Paragraph(_esc(label), s_job))
-
-                meta_parts = [edu.get("period", ""), edu.get("location", "")]
-                meta = "  |  ".join(p for p in meta_parts if p)
-                if meta:
-                    story.append(Paragraph(_esc(meta), s_meta))
-
-        # ── Projects ──
-        if body.projects:
-            story += [Paragraph("PROJECTS", s_section), hr()]
-            for i, proj in enumerate(body.projects):
-                label = proj.get("name", "")
-                if proj.get("period"):
-                    label += f"  |  {proj['period']}"
-                story.append(Paragraph(_esc(label), s_job))
-                for b in proj.get("bullets", []):
-                    story.append(Paragraph(f"• {_esc(b.get('rewritten', ''))}", s_bullet))
-
-                # Issue 4: 8pt gap between entries
-                if i < len(body.projects) - 1:
-                    story.append(Spacer(1, 8))
-
-        # ── Skills (Issue 2 fix: each category on its own line, bold label via markup) ──
-        sk = body.skills
-        if sk.get("rewritten"):
-            story += [Paragraph("SKILLS", s_section), hr()]
-            skill_pairs = _parse_skills(sk.get("rewritten", ""))
-            if skill_pairs:
-                for label, skills in skill_pairs:
-                    story.append(Paragraph(
-                        f"<b>{_esc(label)}:</b> {_esc(skills)}",
-                        s_skill,
-                    ))
-            else:
-                story.append(Paragraph(_esc(sk["rewritten"]), s_body))
-
-        # Keywords Added intentionally omitted (Issue 3)
-
-        doc_pdf.build(story)
+        build_story = _PDF_TEMPLATES.get(body.template, _build_modern_story)
+        doc_pdf.build(build_story(body))
         buffer.seek(0)
 
         return Response(

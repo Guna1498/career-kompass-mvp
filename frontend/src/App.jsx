@@ -9,11 +9,12 @@ import JDInputPage from "./pages/JDInputPage.jsx";
 import CVUploadPage from "./pages/CVUploadPage.jsx";
 import GapAnalysisPage from "./pages/GapAnalysisPage.jsx";
 import CVRewritePage from "./pages/CVRewritePage.jsx";
+import TemplateSelectPage from "./pages/TemplateSelectPage.jsx";
 import ActionPlanPage from "./pages/ActionPlanPage.jsx";
 import HistoryPage from "./pages/HistoryPage.jsx";
 import ProgressBar from "./components/ProgressBar.jsx";
 
-const STEP_LABELS = ["Job Description", "Upload CV", "Gap Analysis", "CV Rewrite", "Action Plan"];
+const STEP_LABELS = ["Job Description", "Upload CV", "Gap Analysis", "CV Rewrite", "Choose Template", "Action Plan"];
 
 function getPageTitle(nav, step) {
   if (nav === "analysis") return `Step ${step}: ${STEP_LABELS[step - 1]}`;
@@ -29,6 +30,7 @@ export default function App() {
   const [step, setStep] = useState(1);
   const [jobDescription, setJobDescription] = useState("");
   const [gapAnalysis, setGapAnalysis] = useState(null);
+  const [rewrittenCv, setRewrittenCv] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem("ck_token");
@@ -45,6 +47,7 @@ export default function App() {
     setStep(1);
     setJobDescription("");
     setGapAnalysis(null);
+    setRewrittenCv(null);
     setNav("dashboard");
   }
 
@@ -52,6 +55,7 @@ export default function App() {
     setStep(1);
     setJobDescription("");
     setGapAnalysis(null);
+    setRewrittenCv(null);
     setNav("analysis");
   }
 
@@ -107,10 +111,16 @@ export default function App() {
               cvText={gapAnalysis.cv_text}
               jobDescription={jobDescription}
               gapAnalysis={gapAnalysis}
-              onNext={() => setStep(5)}
+              onNext={(cv) => { setRewrittenCv(cv); setStep(5); }}
             />
           )}
           {nav === "analysis" && step === 5 && (
+            <TemplateSelectPage
+              cvResult={rewrittenCv}
+              onNext={() => setStep(6)}
+            />
+          )}
+          {nav === "analysis" && step === 6 && (
             <ActionPlanPage
               cvText={gapAnalysis.cv_text}
               jobDescription={jobDescription}
