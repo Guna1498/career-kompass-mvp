@@ -6,6 +6,9 @@ action plan — all in one flow.
 
 Built as a full-stack MVP using FastAPI, React, and the Anthropic Claude API.
 
+**Live demo:** [career-kompass-mvp.vercel.app](https://career-kompass-mvp.vercel.app)
+*(hosted on free tiers — first request after a period of inactivity may take 30-60s to wake up)*
+
 ---
 
 ## What it does
